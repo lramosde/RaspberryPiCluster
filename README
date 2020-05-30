@@ -1,0 +1,264 @@
+-Raspberry pi square - A cluster of two (or more)
+
+Motivation:
+-Learn more about computer networks
+-Learn more about parallel computing by building a small cluster
+(The procedures described below would apply whether you have raspberries, netbooks, notebooks or even 6-CPU computers running GNU/Linux)
+-Take advantage of the size of the Raspberry (low power device, no need to worry about cooling etc).
+-To provide a short "turtle"-rial to everyone interested in set up a small cluster or network.
+
+What one needs:
+-2 Raspberry Pi (at least)
+-Monitor (the TV isn't really necessary)
+-A network switch (perhaps one can use the DSL router as a switch)
+-A USB keyboard and a USB mouse.
+-2 micro USB power sources (5V, > 1A) to power the Raspberries
+-2 SD cards, > 4Gbyte recommended (I used Class 10 SD cards, where one can write data a bit faster but Class 4 or 6 should do the work)
+-Cables, cables and more cables... (I needed an additional HDMI-VGA converter because my monitor has no HDMI input)
+
+*Download the Raspbian image. There are other GNU/Linux images for Raspberry Pi. If the software you need is available for them the instructions below should differ much.
+
+*Umount all partitions in the SD card[s] ( /dev/sdb1, /dev/sdb2, ... )
+  sudo umount /dev/sdb1
+  sudo umount /dev/sdb2
+  ...
+  sudo umount /dev/sdbN
+
+*Write the image starting with the master device (/dev/sdb <- without any number)
+
+  dd -if=file.img -of=/dev/sdb  bs=1M   
+
+under GNU/Linux. In Windows there are some free applications that can do the job. In fact it can be easier than in GNU/Linux.
+
+
+*After writing the SD card remove it (safely) and plug it again. Under GNU/Linux 2 partitions will be mounted (one ext4 and other FAT). If one doesn't see them, an error occurred during the image writing. 
+
+*One needs to write an SD card per Raspberry Pi. One might need to plug at least a monitor and a keyboard to install additional software in each raspberry.
+
+*One of the partitions written in the SD card is a FAT16 or FAT32 partition (Microsoft Windows) and contains the configuration file config.txt.
+The files in this partition can be (probably) edited in the computer the image was written. One may need to edit screen resolution, TV system (NTSC, NTSC Japan, PAL, PAL-M [Brazil]), overscan parameters (screen dimensions) in order to get a workable 
+terminal at least. If one uses HDMI-VGA or HDMI-DVI converters most probably one has to edit these files.
+
+*Look up the documentation for resolution and other settings. 
+One should edit the file
+  config.txt 
+in the FAT partition.
+
+*Try to edit the config.txt file according to the specifications of your monitor or TV set.
+
+*Plug the SD card in the Raspberry board and verify if it's well connected.
+
+*Connect all the cables and devices and at last connect the micro USB power source.
+
+*It is recommended to plug at least a keyboard and mouse (if you are going to use the desktop).
+
+*Do not connect devices which need much power. If you want to connect more devices, use a USB-hub with an external power source.
+
+*The red LED should turn on first and the others should blink (serial communication with the SD card).
+
+*If only the red LED is on and no image appears you might have made a mistake  in writing the image. If no LED is on, well you had bad luck. Shit happened to you.
+
+*If the LEDs blink and still no image appears, remove the SD card and edit the configuration file in another computer.
+
+*After the boot login as "pi", password "raspberry".
+
+*When the SD card is used for the first time the
+  raspi-config 
+terminal application starts after the boot without asking for a password.
+
+*Use the menu to expand the file system to the whole SD card 
+The image is about 2Gbyte and one may need more disk space (>2Gbyte) to install and run applications.
+
+*Enable ssh (server). It is needed for parallelisation and other tasks.
+
+*Choose a keyboard and keyboard layout.
+
+*Change the password if you like.
+
+*Disable login to the desktop (while working in parallel you want to spare as much memory as possible to run the applications. Usually one will have only one node with keyboard, mouse and a monitor. It doesn't make sense to start a desktop that cannot be seen)
+
+*One can choose to overclock the raspberry (to make it work faster, with higher energy consumption and more risks for the device, e.g. overheating of components). Up to 50% increase of speed can be achieved with this procedure. Be careful.
+
+*Login in each node (here a node is a raspberry) and find out their IP numbers with
+  ifconfig        
+Each raspberry should be given an IP number by the router. The IP number looks like inet addr:199.128.199.26)
+If you know the IP address of a raspberry and have the secure shell installed you can logging in with 
+
+ssh pi@199.128.199.26
+
+ (the default user is "pi" and the IP is just an example) 
+
+and transfer files to and from a raspberry 
+by logging in with
+
+sftp pi@199.128.199.26 
+
+
+*Edit the file 
+  /etc/hosts  
+(e.g. sudo vi /etc/hosts [vi is terminal based editor. If you don't know how to use it, well life will be hard to you :D].  "sudo" here means something like "super user do". You might be asked to give a password the first time you run a "sudo" command in a terminal)
+with the aliases for the nodes
+
+  100.000.000.0ZZ node0
+  100.000.000.0YY  node1
+...
+  100.000.000.0XY nodeXX
+
+The aliases are very convenient, since the IP numbers may not be ordered and may be difficult to remember them.
+If you start adding more Raspberries to the cluster it may be useful to edit the file
+
+  /etc/hostname 
+
+and change the hostname "raspberrypi" to  "node0", "node1" etc. This will help to know
+where you are logged in, when you are installing software or just checking connections.
+The hostname will appear at the terminal prompt (bash):
+
+  pi@node0~$   (in node0 )  
+
+(pi@node1~$  pi@node2  etc in the other nodes)
+
+*Create a directory
+
+  /home/pi/share
+
+in each node. This will be the directory to exchange files between the nodes, and compile and run applications to run in parallel. It works if one share the whole /home/pi directory.
+
+*In the node0 edit a file 
+  /etc/exports   (e.g. sudo vi /etc/exports)
+
+including 
+
+  /home/pi/share *(rw,sync,no_subtree_check) 
+
+*Check whether the services 
+  rpcbind 
+  nfs-kernel-server (node0) 
+  nfs-common        (all the other nodes)
+
+are up ( [+] ) with  
+
+  service --status-all
+
+If they are down    
+
+   sudo  service [name of the service] start
+
+starts the service.
+
+
+*If rpcbind is not starting automatically at boot time
+
+   sudo update-rc.d rpcbind enable
+
+will fix it.
+  
+
+*In all the other nodes include a line in the file 
+
+  node0:/home/pi/share  /home/pi/share  nfs rw  0 3
+
+in the file
+
+  /etc/fstab   (e.g. sudo vi /etc/fstab)
+
+* Mount the directory "/home/pi/share"
+
+   sudo mount -a 
+
+This mounts the "/home/pi/share" directory locally at the raspberry or one can just reboot the raspberry. At the boot the directories
+described in /etc/fstab will be mounted. Modifications of files and files copied under this directory will be "seen" by all  raspberries in the cluster. 
+
+Install in all nodes
+* gfortran          (FORTRAN is still widely used in scientific applications
+                     running in clusters)
+* mpich2            (message passing interface [MPI] version most used)
+* nfs-common        (for the nodes to be able to mount the /home/pi/share directory) 
+* nfs-kernel-server (just in case devices or disks in some raspberries  will be shared in other raspberries)
+
+*In node0 install the packages you will need 
+ 
+ sudo apt-get install [package name]
+
+*To connect the nodes without using passwords generate the pair of keys (public and private) 
+
+   ssh-keygen 
+
+under the directory 
+
+   /home/pi/.ssh/
+
+To keep simple accept all with enter. This will generate the files
+ 
+   id_rsa        (private key)
+   id_rsa.pub  (public key)
+
+in node0 keep the private and public keys under the directory 
+
+    /home/pi/.ssh/ 
+
+in all other nodes append the public key to the file  
+
+    /home/pi/.ssh/authorized_keys
+
+Use the secure file transfer protocol  (sftp)
+
+   sftp nodeN   (....enter password)
+   sftp>cd .ssh
+   sftp>put id_rsa.pub authorized_keys 
+   (if you have other authorized keys copy and append to them) 
+   sftp> bye  (... leave the sftp) 
+
+to transfer the file to the nodeN. Now one can login  from the node0, to the other nodes without a password.
+
+
+*Up to this point one didn't need to start the desktop. If you want to test and use the applications above type
+
+   startx
+
+*In the terminal mode one can work with several terminals at the same time without starting the desktop.
+Just press ALT+F1 for the default terminal tty1 (the one one has been using so far) ALT+F2 for tty2, ALT+F3 for tt3 etc. When a new terminal starts, one should login again. One can commute between the terminals by pressing ALT+the F-key corresponding to the terminal. To close a terminal type  exit. 
+
+*Copy the cpi.c code under 
+
+   /home/pi/share 
+
+This  C program calculates the number pi using  MPI (Message Passing Interface). Google cpi.c or look for other MPI examples. 
+The goal here is not calculate the number pi and in fact this is not the best way of calculating it anyway!
+This is just to illustrate how 2 computers can be used to execute a task in parallel.
+
+*Compile cpi.c with
+
+   mpicc -o cpi cpi.c   ( or use the Makefile. Just type make ) 
+
+The mpiXXXX compilers are in reality the GNU-C compiler with some options. However a program compiled with a "MPI" compiler cannot be executed in the usual way.
+
+*Run the cpi it with
+
+   mpiexec -f machine_file -n 2 ./cpi
+
+where machine_file is a text file containing the list of nodes and the number of CPUs per node (1 CPU in this case):
+
+node0:1
+node1:1
+....
+nodeN:1
+
+*In principle one can cluster different computers with different CPUs  and configurations. However if you're executing a task using MPI it is convenient to  have the same computers in each node. If there much faster nodes,  it can happen they will have to wait for the slow ones. If the CPUs are the same they will finish "their share of the pi" more or less at the same time saving energy and resources.
+
+*I would not go much further with the number or Raspberries in a cluster. Perhaps one can have something interesting with 5 or 10 of them. The speed of the network connection will start to limit the efficiency of the cluster at a certain point.      
+
+
+*How to switch off the Raspberries?
+Well for safety I'd do
+
+  sudo shutdown -h now
+
+or 
+
+  sudo halt
+
+in each of them. But perhaps is safe just to disconnect the power source.
+
+*I'm no specialist in clusters. I've been a user of computer clusters for some years already. I've learned (I'm learning) a lot with videos, documentation and forums in Internet, while trying to build the "pi square". Do the same as I did and share what you've learned.
+
+
